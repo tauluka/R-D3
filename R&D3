@@ -1,0 +1,403 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
+import os
+from datetime import datetime
+
+# -----------------------------
+# DEFAULT SUSPICIOUS KEYWORDS
+# -----------------------------
+default_keywords = ["urgent", "password", "bank", "click here", "free"]
+
+
+class FolderScannerApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Level Zero Security - Folder Scanner")
+        self.root.geometry("1000x700")
+        self.root.configure(bg="#1e1e1e")
+
+        # Store selected folder path
+        self.selected_folder = ""
+
+        # List of keywords the scanner will use
+        self.keywords = default_keywords.copy()
+
+        # File type filter choices
+        self.file_types = {
+            ".txt": tk.BooleanVar(value=True),
+            ".log": tk.BooleanVar(value=True),
+            ".csv": tk.BooleanVar(value=True)
+        }
+
+        # Scan statistics
+        self.total_files = 0
+        self.warning_files = 0
+        self.safe_files = 0
+        self.error_files = 0
+
+        # Build the GUI
+        self.build_gui()
+
+    # -----------------------------
+    # TASK 1 + TASK 12: GUI SETUP / IMPROVED LAYOUT
+    # -----------------------------
+    def build_gui(self):
+        # Title
+        title_label = tk.Label(
+            self.root,
+            text="Level Zero Security Toolkit - Folder Scanner",
+            font=("Arial", 18, "bold"),
+            bg="#1e1e1e",
+            fg="#00ff99"
+        )
+        title_label.pack(pady=15)
+
+        # Main top frame
+        top_frame = tk.Frame(self.root, bg="#1e1e1e")
+        top_frame.pack(fill="x", padx=20, pady=10)
+
+        # Folder selection frame
+        folder_frame = tk.LabelFrame(
+            top_frame,
+            text="Folder Selection",
+            bg="#1e1e1e",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            bd=2
+        )
+        folder_frame.pack(fill="x", pady=8)
+
+        self.folder_button = tk.Button(
+            folder_frame,
+            text="Choose Folder",
+            command=self.select_folder,
+            bg="#333333",
+            fg="white",
+            font=("Arial", 10, "bold"),
+            width=15
+        )
+        self.folder_button.pack(side="left", padx=10, pady=10)
+
+        self.folder_label = tk.Label(
+            folder_frame,
+            text="No folder selected",
+            bg="#1e1e1e",
+            fg="#cccccc",
+            font=("Arial", 10),
+            anchor="w"
+        )
+        self.folder_label.pack(side="left", fill="x", expand=True, padx=10)
+
+        # Keyword frame
+        keyword_frame = tk.LabelFrame(
+            top_frame,
+            text="Keyword Settings",
+            bg="#1e1e1e",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            bd=2
+        )
+        keyword_frame.pack(fill="x", pady=8)
+
+        self.keyword_entry = tk.Entry(
+            keyword_frame,
+            width=30,
+            font=("Arial", 10),
+            bg="#2d2d2d",
+            fg="white",
+            insertbackground="white"
+        )
+        self.keyword_entry.pack(side="left", padx=10, pady=10)
+
+        add_keyword_button = tk.Button(
+            keyword_frame,
+            text="Add Keyword",
+            command=self.add_keyword,
+            bg="#444444",
+            fg="white",
+            font=("Arial", 10, "bold")
+        )
+        add_keyword_button.pack(side="left", padx=5)
+
+        self.keyword_list_label = tk.Label(
+            keyword_frame,
+            text=f"Current Keywords: {', '.join(self.keywords)}",
+            bg="#1e1e1e",
+            fg="#cccccc",
+            font=("Arial", 10),
+            anchor="w",
+            justify="left"
+        )
+        self.keyword_list_label.pack(side="left", fill="x", expand=True, padx=10)
+
+        # File type filter frame
+        filter_frame = tk.LabelFrame(
+            top_frame,
+            text="File Type Filter",
+            bg="#1e1e1e",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            bd=2
+        )
+        filter_frame.pack(fill="x", pady=8)
+
+        for ext, var in self.file_types.items():
+            cb = tk.Checkbutton(
+                filter_frame,
+                text=ext,
+                variable=var,
+                bg="#1e1e1e",
+                fg="white",
+                selectcolor="#2d2d2d",
+                activebackground="#1e1e1e",
+                activeforeground="white",
+                font=("Arial", 10)
+            )
+            cb.pack(side="left", padx=10, pady=10)
+
+        # Control buttons frame
+        button_frame = tk.Frame(top_frame, bg="#1e1e1e")
+        button_frame.pack(fill="x", pady=10)
+
+        scan_button = tk.Button(
+            button_frame,
+            text="Scan Folder",
+            command=self.scan_folder,
+            bg="#0066cc",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=15
+        )
+        scan_button.pack(side="left", padx=5)
+
+        export_button = tk.Button(
+            button_frame,
+            text="Export Report",
+            command=self.export_report,
+            bg="#228B22",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=15
+        )
+        export_button.pack(side="left", padx=5)
+
+        clear_button = tk.Button(
+            button_frame,
+            text="Clear Output",
+            command=self.clear_output,
+            bg="#8B0000",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            width=15
+        )
+        clear_button.pack(side="left", padx=5)
+
+        # -----------------------------
+        # TASK 11: PROGRESS INDICATOR
+        # -----------------------------
+        self.progress = ttk.Progressbar(self.root, orient="horizontal", length=400, mode="determinate")
+        self.progress.pack(fill="x", padx=20, pady=10)
+
+        # Output frame
+        output_frame = tk.LabelFrame(
+            self.root,
+            text="Scan Results",
+            bg="#1e1e1e",
+            fg="white",
+            font=("Arial", 11, "bold"),
+            bd=2
+        )
+        output_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        # -----------------------------
+        # TASK 5: OUTPUT TEXTBOX
+        # -----------------------------
+        self.output_text = tk.Text(
+            output_frame,
+            wrap="word",
+            bg="#111111",
+            fg="white",
+            font=("Consolas", 10)
+        )
+        self.output_text.pack(side="left", fill="both", expand=True, padx=5, pady=5)
+
+        scrollbar = tk.Scrollbar(output_frame, command=self.output_text.yview)
+        scrollbar.pack(side="right", fill="y")
+        self.output_text.config(yscrollcommand=scrollbar.set)
+
+        # -----------------------------
+        # TASK 7: COLOR CODING
+        # -----------------------------
+        self.output_text.tag_config("warning", foreground="orange")
+        self.output_text.tag_config("safe", foreground="lightgreen")
+        self.output_text.tag_config("error", foreground="red")
+        self.output_text.tag_config("summary", foreground="cyan")
+        self.output_text.tag_config("info", foreground="white")
+
+    # -----------------------------
+    # TASK 2: FOLDER SELECTION
+    # -----------------------------
+    def select_folder(self):
+        folder = filedialog.askdirectory()
+
+        if folder:
+            self.selected_folder = folder
+            self.folder_label.config(text=self.selected_folder)
+        else:
+            self.selected_folder = ""
+            self.folder_label.config(text="No folder selected")
+
+    # -----------------------------
+    # TASK 8: ADD NEW KEYWORD INPUT
+    # -----------------------------
+    def add_keyword(self):
+        new_keyword = self.keyword_entry.get().strip().lower()
+
+        if not new_keyword:
+            messagebox.showwarning("Input Error", "Please enter a keyword.")
+            return
+
+        if new_keyword in self.keywords:
+            messagebox.showinfo("Duplicate Keyword", f"'{new_keyword}' is already in the keyword list.")
+            return
+
+        self.keywords.append(new_keyword)
+        self.keyword_list_label.config(text=f"Current Keywords: {', '.join(self.keywords)}")
+        self.keyword_entry.delete(0, tk.END)
+
+    # Helper: clear output
+    def clear_output(self):
+        self.output_text.delete("1.0", tk.END)
+        self.progress["value"] = 0
+
+    # Helper: get selected file extensions
+    def get_selected_extensions(self):
+        return [ext for ext, var in self.file_types.items() if var.get()]
+
+    # -----------------------------
+    # TASK 3, 4, 6, 9, 11
+    # FILE SCANNING / DETECTION / SUMMARY / FILTER / PROGRESS
+    # -----------------------------
+    def scan_folder(self):
+        if not self.selected_folder:
+            messagebox.showwarning("No Folder", "Please choose a folder first.")
+            return
+
+        selected_extensions = self.get_selected_extensions()
+        if not selected_extensions:
+            messagebox.showwarning("No File Types", "Please select at least one file type.")
+            return
+
+        self.output_text.delete("1.0", tk.END)
+
+        # Reset stats
+        self.total_files = 0
+        self.warning_files = 0
+        self.safe_files = 0
+        self.error_files = 0
+
+        files_to_scan = []
+
+        # First pass: collect all matching files
+        for root_dir, dirs, files in os.walk(self.selected_folder):
+            for file in files:
+                _, ext = os.path.splitext(file)
+                if ext.lower() in selected_extensions:
+                    files_to_scan.append(os.path.join(root_dir, file))
+
+        if not files_to_scan:
+            self.output_text.insert(tk.END, "No matching files found.\n", "error")
+            return
+
+        self.progress["maximum"] = len(files_to_scan)
+        self.progress["value"] = 0
+
+        # Scan each file
+        for index, filepath in enumerate(files_to_scan, start=1):
+            self.total_files += 1
+
+            try:
+                # Read files safely
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    content = f.read().lower()
+
+                found_keywords = [kw for kw in self.keywords if kw in content]
+
+                if found_keywords:
+                    self.warning_files += 1
+                    self.output_text.insert(
+                        tk.END,
+                        f"[WARNING] {filepath}\n    Found: {', '.join(found_keywords)}\n\n",
+                        "warning"
+                    )
+                else:
+                    self.safe_files += 1
+                    self.output_text.insert(
+                        tk.END,
+                        f"[SAFE]    {filepath}\n\n",
+                        "safe"
+                    )
+
+            except Exception as e:
+                self.error_files += 1
+                self.output_text.insert(
+                    tk.END,
+                    f"[ERROR]   {filepath}\n    Reason: {str(e)}\n\n",
+                    "error"
+                )
+
+            self.progress["value"] = index
+            self.root.update_idletasks()
+
+        # -----------------------------
+        # TASK 6: SUMMARY
+        # -----------------------------
+        summary_text = (
+            "\n========== SCAN SUMMARY ==========\n"
+            f"Total Files Scanned: {self.total_files}\n"
+            f"Warnings Found:      {self.warning_files}\n"
+            f"Safe Files:          {self.safe_files}\n"
+            f"Errors:              {self.error_files}\n"
+            "==================================\n"
+        )
+
+        self.output_text.insert(tk.END, summary_text, "summary")
+
+    # -----------------------------
+    # TASK 10: EXPORT REPORT
+    # -----------------------------
+    def export_report(self):
+        content = self.output_text.get("1.0", tk.END).strip()
+
+        if not content:
+            messagebox.showwarning("No Data", "There is no scan output to export.")
+            return
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text Files", "*.txt")],
+            title="Save Scan Report"
+        )
+
+        if not filename:
+            return
+
+        try:
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("Level Zero Security - Folder Scan Report\n")
+                f.write(f"Generated: {datetime.now()}\n")
+                f.write("=" * 50 + "\n\n")
+                f.write(content)
+
+            messagebox.showinfo("Export Successful", f"Report saved to:\n{filename}")
+        except Exception as e:
+            messagebox.showerror("Export Failed", f"Could not save file.\n\nReason: {str(e)}")
+
+
+# -----------------------------
+# MAIN PROGRAM START
+# -----------------------------
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = FolderScannerApp(root)
+    root.mainloop()
